@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Servir archivos estáticos del frontend
+// Servir los archivos estáticos de la carpeta public
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SECRET = 'secreto_super_seguro_promo_fiesta';
@@ -50,7 +50,7 @@ db.serialize(() => {
     salida DATETIME
   )`);
 
-  // Crear productos iniciales si está vacío
+  // Crear productos iniciales si la tabla está vacía
   db.get("SELECT COUNT(*) as count FROM productos", (err, row) => {
     if (row && row.count === 0) {
       db.run("INSERT INTO productos (nombre, precio, stock, imagen) VALUES ('Pack Paty', 5000, 50, '🍔')");
@@ -58,7 +58,7 @@ db.serialize(() => {
     }
   });
 
-  // Cuenta Jefe por defecto
+  // Crear cuenta de Jefe por defecto si no existe
   db.get("SELECT COUNT(*) as count FROM users WHERE role = 'OWNER'", async (err, row) => {
     if (row && row.count === 0) {
       const hashed = await bcrypt.hash('123456', 10);
@@ -177,4 +177,53 @@ app.get('/api/owner/resumen', verificarToken, (req, res) => {
 app.post('/api/owner/reiniciar-caja', verificarToken, (req, res) => {
   if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
   db.run("DELETE FROM ventas", [], (err) => {
-    if (err) return res.status(500).json({ mensaje: '
+    if (err) return res.status(500).json({ mensaje: 'Error al reiniciar caja' });
+    res.json({ mensaje: '¡Caja y rendimiento reiniciados a $0 con éxito!' });
+  });
+});
+
+app.post('/api/owner/producto', verificarToken, (req, res) => {
+  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
+  const { nombre, precio, stock, imagen } = req.body;
+  db.run("INSERT INTO productos (nombre, precio, stock, imagen) VALUES (?, ?, ?, ?)", [nombre, precio, stock, imagen || '📦'], (err) => {
+    res.json({ mensaje: 'Producto creado' });
+  });
+});
+
+app.post('/api/owner/stock', verificarToken, (req, res) => {
+  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
+  const { productoId, nuevoStock, nuevoPrecio } = req.body;
+  db.run("UPDATE productos SET stock = ?, precio = ? WHERE id = ?", [nuevoStock, nuevoPrecio, productoId], (err) => {
+    res.json({ mensaje: 'Producto actualizado' });
+  });
+});
+
+app.post('/api/empleados', verificarToken, async (req, res) => {
+  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
+  const { nombre, email, password } = req.body;
+  const hashed = await bcrypt.hash(password, 10);
+  db.run("INSERT INTO users (nombre, email, password, role) VALUES (?, ?, ?, 'TRABAJADOR')", [nombre, email, hashed], (err) => {
+    if (err) return res.status(400).json({ mensaje: 'El email ya existe' });
+    res.json({ mensaje: 'Empleado creado' });
+  });
+});
+
+app.post('/api/fichaje/entrada', verificarToken, (req, res) => {
+  db.run("INSERT INTO fichajes (usuario_id) VALUES (?)", [req.usuario.id], () => {
+    res.json({ mensaje: 'Entrada registrada' });
+  });
+});
+
+app.post('/api/fichaje/salida', verificarToken, (req, res) => {
+  db.run("UPDATE fichajes SET salida = CURRENT_TIMESTAMP WHERE usuario_id = ? AND salida IS NULL", [req.usuario.id], () => {
+    res.json({ mensaje: 'Salida registrada' });
+  });
+});
+
+// Ruta comodín para redirigir cualquier consulta estática al index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
