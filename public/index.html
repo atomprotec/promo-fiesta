@@ -15,7 +15,8 @@
     <div id="app"></div>
 
     <script>
-        const API = 'http://localhost:3000/api';
+        // Configuración dinámica de API para Render y desarrollo local
+        const API = '/api';
         let token = localStorage.getItem('token') || '';
         let role = localStorage.getItem('role') || '';
         let nombre = localStorage.getItem('nombre') || '';
