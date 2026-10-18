@@ -8,6 +8,8 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SECRET = 'secreto_super_seguro_promo_fiesta';
@@ -77,9 +79,8 @@ const verificarToken = (req, res, next) => {
   }
 };
 
-// --- RUTAS --- //
+// --- RUTAS API --- //
 
-// Login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
@@ -91,12 +92,10 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// Ver Productos
 app.get('/api/productos', verificarToken, (req, res) => {
   db.all("SELECT * FROM productos", [], (err, rows) => res.json(rows || []));
 });
 
-// Registrar Venta
 app.post('/api/ventas', verificarToken, (req, res) => {
   const { items } = req.body;
   if (!items || items.length === 0) return res.status(400).json({ mensaje: 'Sin items' });
@@ -130,14 +129,12 @@ app.post('/api/ventas', verificarToken, (req, res) => {
   });
 });
 
-// Mis Ventas (Trabajador)
 app.get('/api/mis-ventas', verificarToken, (req, res) => {
   db.get("SELECT COUNT(*) as misVentas FROM ventas WHERE usuario_id = ?", [req.usuario.id], (err, row) => {
     res.json({ misVentas: row ? row.misVentas : 0 });
   });
 });
 
-// Resumen General (Jefe)
 app.get('/api/owner/resumen', verificarToken, (req, res) => {
   if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
 
@@ -177,54 +174,7 @@ app.get('/api/owner/resumen', verificarToken, (req, res) => {
   });
 });
 
-// REINICIAR CAJA Y VENTAS (Solo Jefe)
 app.post('/api/owner/reiniciar-caja', verificarToken, (req, res) => {
   if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
   db.run("DELETE FROM ventas", [], (err) => {
-    if (err) return res.status(500).json({ mensaje: 'Error al reiniciar caja' });
-    res.json({ mensaje: '¡Caja y rendimiento reiniciados a $0 con éxito!' });
-  });
-});
-
-// Gestión de Productos
-app.post('/api/owner/producto', verificarToken, (req, res) => {
-  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
-  const { nombre, precio, stock, imagen } = req.body;
-  db.run("INSERT INTO productos (nombre, precio, stock, imagen) VALUES (?, ?, ?, ?)", [nombre, precio, stock, imagen || '📦'], (err) => {
-    res.json({ mensaje: 'Producto creado' });
-  });
-});
-
-app.post('/api/owner/stock', verificarToken, (req, res) => {
-  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
-  const { productoId, nuevoStock, nuevoPrecio } = req.body;
-  db.run("UPDATE productos SET stock = ?, precio = ? WHERE id = ?", [nuevoStock, nuevoPrecio, productoId], (err) => {
-    res.json({ mensaje: 'Producto actualizado' });
-  });
-});
-
-// Gestión de Empleados
-app.post('/api/empleados', verificarToken, async (req, res) => {
-  if (req.usuario.role !== 'OWNER') return res.status(403).json({ mensaje: 'Acceso denegado' });
-  const { nombre, email, password } = req.body;
-  const hashed = await bcrypt.hash(password, 10);
-  db.run("INSERT INTO users (nombre, email, password, role) VALUES (?, ?, ?, 'TRABAJADOR')", [nombre, email, hashed], (err) => {
-    if (err) return res.status(400).json({ mensaje: 'El email ya existe' });
-    res.json({ mensaje: 'Empleado creado' });
-  });
-});
-
-// Fichajes
-app.post('/api/fichaje/entrada', verificarToken, (req, res) => {
-  db.run("INSERT INTO fichajes (usuario_id) VALUES (?)", [req.usuario.id], () => {
-    res.json({ mensaje: 'Entrada registrada' });
-  });
-});
-
-app.post('/api/fichaje/salida', verificarToken, (req, res) => {
-  db.run("UPDATE fichajes SET salida = CURRENT_TIMESTAMP WHERE usuario_id = ? AND salida IS NULL", [req.usuario.id], () => {
-    res.json({ mensaje: 'Salida registrada' });
-  });
-});
-
-app.listen(3000, () => console.log('🚀 Servidor listo en http://localhost:3000'));
+    if (err) return res.status(500).json({ mensaje: '
